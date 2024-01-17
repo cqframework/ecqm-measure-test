@@ -4,6 +4,7 @@ import { Button, OverlayTrigger, Spinner, Tooltip } from 'react-bootstrap';
 import { PatientFetch } from '../data/PatientFetch';
 import { Patient } from '../models/Patient';
 import { Server } from '../models/Server';
+import { ServerUtils } from '../utils/ServerUtils';
 
 interface props {
   showDataRepo: boolean;
@@ -26,6 +27,11 @@ const DataRepository: React.FC<props> = ({ showDataRepo, setShowDataRepo, server
     const patDisplay = PatientFetch.buildUniquePatientIdentifier(patient);
     return patDisplay && patDisplay.toLowerCase().includes(patientFilter.toLowerCase());
   });
+
+
+  const buildPatientDropdownTooltip = (patient:any): string => {
+    return 'Name:\t' + (patient?.display ?? '')  + '\nID:\t' + (patient?.id ?? '');  
+  }
 
   return (
     <div className='card'>
@@ -68,7 +74,10 @@ const DataRepository: React.FC<props> = ({ showDataRepo, setShowDataRepo, server
                 onChange={(e) => fetchPatients(servers[e.target.selectedIndex - 1]!)}>
                 <option value=''>Select a Server...</option>
                 {servers.map((server, index) => (
-                  <option key={index}>{server!.baseUrl}</option>
+                  <option key={index}
+                    title={ServerUtils.buildDropdownTooltip(server)}
+                  >{server!.baseUrl}</option>
+
                 ))}
               </select>
             </div>
@@ -91,7 +100,9 @@ const DataRepository: React.FC<props> = ({ showDataRepo, setShowDataRepo, server
                 }}>
                 <option value=''>Select a Patient...</option>
                 {filteredPatients.map((patient, index) => (
-                  <option key={index} value={patient?.id || ''}>
+                  <option key={index} value={patient?.id || ''} 
+                  title={buildPatientDropdownTooltip(patient)}
+                  >
                     {PatientFetch.buildUniquePatientIdentifier(patient)}
                   </option>
                 ))}
