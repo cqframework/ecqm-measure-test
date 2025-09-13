@@ -1,24 +1,27 @@
 import { Constants } from '../constants/Constants';
 import { StringUtils } from '../utils/StringUtils';
 import { AbstractDataFetch, FetchType } from './AbstractDataFetch';
+import { Server } from '../models/Server';
+import { OutcomeTrackerUtils } from '../utils/OutcomeTrackerUtils';
 
 export class DataRequirementsFetch extends AbstractDataFetch {
     type: FetchType;
 
-    selectedKnowledgeRepo: string = '';
+    selectedKnowledgeRepo: Server | undefined;
     selectedMeasure: string = '';
     startDate: string = '';
     endDate: string = '';
 
-    constructor(selectedKnowledgeRepo: string,
+    constructor(selectedKnowledgeRepo: Server | undefined,
         selectedMeasure: string,
         startDate: string,
         endDate: string) {
 
-        super();
+        super(selectedKnowledgeRepo);
+
         this.type = FetchType.DATA_REQUIREMENTS;
 
-        if (!selectedKnowledgeRepo || selectedKnowledgeRepo === '') {
+        if (!selectedKnowledgeRepo) {
             throw new Error(StringUtils.format(Constants.missingProperty, 'selectedKnowledgeRepo'));
         }
 
@@ -41,13 +44,16 @@ export class DataRequirementsFetch extends AbstractDataFetch {
     }
 
     public getUrl(): string {
-        return this.selectedKnowledgeRepo + 'Measure/' + this.selectedMeasure +
-        '/$data-requirements?periodStart=' + this.startDate + '&periodEnd=' + this.endDate;
+        return this.selectedKnowledgeRepo?.baseUrl + 'Measure/' + this.selectedMeasure +
+            '/$data-requirements?periodStart=' + this.startDate + '&periodEnd=' + this.endDate;
     }
 
     protected processReturnedData(data: any) {
-        const ret: string = JSON.stringify(data, undefined, 2)
-        return ret;
+        return OutcomeTrackerUtils.buildOutcomeTracker(
+            this.getUrl(),
+            data,
+            'Data Requirements',
+            this.selectedBaseServer);
     }
 
 }

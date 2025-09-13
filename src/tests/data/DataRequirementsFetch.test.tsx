@@ -1,13 +1,23 @@
 import fetchMock from 'fetch-mock';
 import { Constants } from '../../constants/Constants';
 import { DataRequirementsFetch } from '../../data/DataRequirementsFetch';
+import { Server } from '../../models/Server';
+import { ServerUtils } from '../../utils/ServerUtils';
 import { StringUtils } from '../../utils/StringUtils';
 import jsonTestDataRequirementsData from '../resources/fetchmock-knowledge-repo.json';
 
 
-test('required properties check', () => {
+beforeEach(() => {
+    jest.spyOn(ServerUtils, 'getServerList').mockImplementation(async () => {
+        return Constants.serverTestData;
+    });
+});
+
+test('required properties check', async () => {
+    const dataServer: Server = Constants.serverTestData[0];
+
     try {
-        new DataRequirementsFetch('',
+        new DataRequirementsFetch(undefined,
             'selectedMeasure',
             'startDate',
             'endDate');
@@ -16,7 +26,7 @@ test('required properties check', () => {
     }
 
     try {
-        new DataRequirementsFetch('selectedKnowledgeRepo',
+        new DataRequirementsFetch(dataServer,
             '',
             'startDate',
             'endDate');
@@ -25,7 +35,7 @@ test('required properties check', () => {
     }
 
     try {
-        new DataRequirementsFetch('selectedKnowledgeRepo',
+        new DataRequirementsFetch(dataServer,
             'selectedMeasure',
             '',
             'endDate');
@@ -34,7 +44,7 @@ test('required properties check', () => {
     }
 
     try {
-        new DataRequirementsFetch('selectedKnowledgeRepo',
+        new DataRequirementsFetch(dataServer,
             'selectedMeasure',
             'startDate',
             '');
@@ -46,7 +56,9 @@ test('required properties check', () => {
 
 
 test('get DataRequirements mock', async () => {
-    const dataRequirementsFetch = new DataRequirementsFetch('selectedKnowledgeRepo',
+    const dataServer: Server = Constants.serverTestData[0];
+
+    const dataRequirementsFetch = new DataRequirementsFetch(dataServer,
         'selectedMeasure',
         'startDate',
         'endDate');
@@ -54,7 +66,7 @@ test('get DataRequirements mock', async () => {
     fetchMock.once(dataRequirementsFetch.getUrl(),
         JSON.stringify(mockJsonDataRequirementsData)
         , { method: 'GET' });
-    let collectedData: string = await dataRequirementsFetch.fetchData()
+    let collectedData: string | undefined = await (await dataRequirementsFetch.fetchData()).jsonFormattedString
     expect(collectedData).toEqual(JSON.stringify(mockJsonDataRequirementsData, undefined, 2));
 
     fetchMock.restore();
@@ -62,9 +74,11 @@ test('get DataRequirements mock', async () => {
 });
 
 test('get DataRequirements mock error', async () => {
+    const dataServer: Server = Constants.serverTestData[0];
+
     const errorMsg = 'this is a test'
     let errorCatch = '';
-    const dataRequirementsFetch = new DataRequirementsFetch('selectedKnowledgeRepo',
+    const dataRequirementsFetch = new DataRequirementsFetch(dataServer,
         'selectedMeasure',
         'startDate',
         'endDate');
@@ -76,18 +90,8 @@ test('get DataRequirements mock error', async () => {
         errorCatch = error.message;
     }
 
-    expect(errorCatch).toEqual('Using selectedKnowledgeRepoMeasure/selectedMeasure/$data-requirements?periodStart=startDate&periodEnd=endDate to retrieve Data Requirements caused: Error: this is a test');
+    expect(errorCatch).toEqual('Using http://localhost:8080/1/Measure/selectedMeasure/$data-requirements?periodStart=startDate&periodEnd=endDate for Data Requirements caused: Error: this is a test');
 
     fetchMock.restore();
 
 });
-
-test('test urlformat', async () => {
-    let dataRequirementsFetch = await new DataRequirementsFetch('selectedKnowledgeRepo',
-        'selectedMeasure',
-        'startDate',
-        'endDate');
-    expect(dataRequirementsFetch.getUrl())
-        .toEqual('selectedKnowledgeRepoMeasure/selectedMeasure/$data-requirements?periodStart=startDate&periodEnd=endDate');
-});
-

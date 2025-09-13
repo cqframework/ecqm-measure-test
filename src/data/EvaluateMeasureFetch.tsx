@@ -1,34 +1,41 @@
 import { Constants } from '../constants/Constants';
-import { MeasureData } from '../models/MeasureData';
-import { MeasureReport } from '../models/MeasureReport';
-import { MeasureReportGroup } from '../models/MeasureReportGroup';
-import { Population } from '../models/Population';
+import { OutcomeTracker } from '../models/OutcomeTracker';
+import { Patient } from '../models/Patient';
+import { PatientGroup } from '../models/PatientGroup';
+import { Server } from '../models/Server';
+import { OutcomeTrackerUtils } from '../utils/OutcomeTrackerUtils';
 import { StringUtils } from '../utils/StringUtils';
 import { AbstractDataFetch, FetchType } from './AbstractDataFetch';
 
 export class EvaluateMeasureFetch extends AbstractDataFetch {
     type: FetchType;
 
-    selectedServer: string = '';
-    selectedPatient: string = '';
+    selectedMeasureEvaluationServer: Server | undefined;
+    selectedPatient: Patient | undefined;
     selectedMeasure: string = '';
     startDate: string = '';
     endDate: string = '';
+    patientGroup: PatientGroup | undefined;
+    useSubject: boolean = false;
 
-    constructor(selectedServer: string,
-        selectedPatient: string,
+    constructor(selectedMeasureEvaluationServer: Server | undefined,
         selectedMeasure: string,
         startDate: string,
-        endDate: string) {
+        endDate: string,
+        useSubject: boolean,
+        selectedPatient?: Patient,
+        patientGroup?: PatientGroup | undefined,
+    ) {
 
-        super();
+        super(selectedMeasureEvaluationServer);
+
         this.type = FetchType.EVALUATE_MEASURE;
 
-        if (!selectedServer || selectedServer === '') {
+        if (!selectedMeasureEvaluationServer || selectedMeasureEvaluationServer.baseUrl === '') {
             throw new Error(StringUtils.format(Constants.missingProperty, 'selectedServer'));
         }
 
-        if (!selectedMeasure || selectedMeasure === '') {
+        if (!selectedMeasure) {
             throw new Error(StringUtils.format(Constants.missingProperty, 'selectedMeasure'));
         }
 
@@ -40,52 +47,63 @@ export class EvaluateMeasureFetch extends AbstractDataFetch {
             throw new Error(StringUtils.format(Constants.missingProperty, 'endDate'));
         }
 
-        if (selectedServer) this.selectedServer = selectedServer;
+        if (useSubject) {
+            if (!selectedPatient || selectedPatient.id === '') {
+                if (!patientGroup || patientGroup.id === '') {
+                    throw new Error(StringUtils.format(Constants.missingProperty, 'Patient or Group'));
+                }
+            }
+        }
+
+        this.selectedMeasureEvaluationServer = selectedMeasureEvaluationServer;
+        this.selectedMeasure = selectedMeasure;
+        this.startDate = startDate;
+        this.endDate = endDate;
+        this.useSubject = useSubject;
+
+        if (patientGroup) this.patientGroup = patientGroup;
         if (selectedPatient) this.selectedPatient = selectedPatient;
-        if (selectedMeasure) this.selectedMeasure = selectedMeasure;
-        if (startDate) this.startDate = startDate;
-        if (endDate) this.endDate = endDate;
+
     }
+
+
 
     public getUrl(): string {
-        if (this.selectedPatient === '') {
-            return StringUtils.format(Constants.evaluateMeasureFetchURL,
-                this.selectedMeasure, this.selectedMeasure,
-                this.startDate, this.endDate);
-        } else {
-            return StringUtils.format(Constants.evaluateMeasureWithPatientFetchURL,
-                this.selectedServer, this.selectedMeasure,
-                this.selectedPatient, this.startDate, this.endDate);
+
+        let subject = '';
+        if (this.useSubject) {
+            if (this.selectedPatient?.id) {
+                subject = 'Patient/' + this.selectedPatient.id;
+            } else if (this.patientGroup) {
+                subject = 'Group/' + this.patientGroup.id;
+            }
+            return StringUtils.format(Constants.fetch_evaluateMeasureWithSubject,
+                this.selectedMeasureEvaluationServer?.baseUrl,
+                this.selectedMeasure,
+                this.startDate,
+                this.endDate,
+                subject
+            );
         }
+
+        //useSubject not true, return url without subject line
+        return StringUtils.format(Constants.fetch_evaluateMeasureWithSubject.replace('&subject={4}', ''),
+            this.selectedMeasureEvaluationServer?.baseUrl,
+            this.selectedMeasure,
+            this.startDate,
+            this.endDate
+        );
+
     }
 
-    protected processReturnedData(data: any) {
-
-        const jsonData = data;
-
-        let report: MeasureReport = data;
-        let groups = report.group;
-        let populations = groups.map((group: MeasureReportGroup) => {
-            return group.population;
-        });
-        let pop = populations[0];
-        let popNames = pop.map((pop: Population) => {
-            return pop.code.coding[0].code;
-        });
-        let counts = pop.map((pop: Population) => {
-            return pop.count;
-        });
-
-        const popNamesData = popNames;
-        const countsData = counts;
-
-        let measureData: MeasureData = {
-            jsonBody: jsonData,
-            popNames: popNamesData,
-            counts: countsData
-        }
-        return measureData;
+    protected processReturnedData(data: any): OutcomeTracker {
+        const measureGroups = data?.group && Array.isArray(data?.group) ? data.group : undefined;
+        return OutcomeTrackerUtils.buildOutcomeTracker(
+            this.getUrl(),
+            data,
+            'Measure Evaluation',
+            this.selectedBaseServer,
+            measureGroups);
     }
 
 }
- 
